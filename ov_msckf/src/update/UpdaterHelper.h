@@ -52,9 +52,18 @@ public:
    * @brief Feature object that our UpdaterHelper leverages, has all measurements and means
    */
   struct UpdaterHelperFeature {
+    struct BaseFrames {
+      size_t left_baseframe_index;
+      size_t right_baseframe_index;
+      double left_baseframe_timestamp;
+      double right_baseframe_timestamp;
+    };
 
     /// Unique ID of this feature
     size_t featid;
+
+    /// BaseFrames of the feature to do pose only depth calculation
+    BaseFrames baseframes;
 
     /// UV coordinates that this feature has been seen from (mapped by camera ID)
     std::unordered_map<size_t, std::vector<Eigen::VectorXf>> uvs;
@@ -109,7 +118,7 @@ public:
    * @param[out] res Measurement residual for this feature
    * @param[out] x_order Extra variables our extra Jacobian has (for example anchored pose)
    */
-  static void get_feature_jacobian_full(std::shared_ptr<State> state, UpdaterHelperFeature &feature, Eigen::MatrixXd &H_f,
+  static void get_feature_jacobian_full(std::shared_ptr<State> state, UpdaterHelperFeature &feature,
                                         Eigen::MatrixXd &H_x, Eigen::VectorXd &res, std::vector<std::shared_ptr<ov_type::Type>> &x_order);
 
   /**
