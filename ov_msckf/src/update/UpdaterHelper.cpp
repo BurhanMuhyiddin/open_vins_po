@@ -292,9 +292,8 @@ void UpdaterHelper::get_feature_jacobian_full(std::shared_ptr<State> state, Upda
   // Allocate our residual and Jacobians
   int c = 0;
   // int jacobsize = (feature.feat_representation != LandmarkRepresentation::Representation::ANCHORED_INVERSE_DEPTH_SINGLE) ? 3 : 1;
-  // PO-KF: we subtract 4 from total size, because we are skipping left and rightbaseframes in jacobian calculation 
-  res = Eigen::VectorXd::Zero(2 * total_meas - 2*2);
-  H_x = Eigen::MatrixXd::Zero(2 * total_meas - 2*2, total_hx);
+  res = Eigen::VectorXd::Zero(2 * total_meas);
+  H_x = Eigen::MatrixXd::Zero(2 * total_meas, total_hx);
 
   // Derivative of p_FinG in respect to feature representation.
   // This only needs to be computed once and thus we pull it out of the loop
@@ -477,7 +476,7 @@ void UpdaterHelper::get_feature_jacobian_full(std::shared_ptr<State> state, Upda
 
       H_x.block(2 * c, map_hx[clone_Iright], 2, clone_Iright->size()).noalias() = dz_dzn * dzn_dpfc * (J_dfleft_pfci * (J_TCright_dfleft * J_x_Tc_right));
       
-      H_x.block(2 * c, map_hx[clone_Ii], 2, clone_Ii->size()).noalias() = dz_dzn * dzn_dpfc * (J_Tci_pfci * J_x_Tc);
+      H_x.block(2 * c, map_hx[clone_Ii], 2, clone_Ii->size()).noalias() += dz_dzn * dzn_dpfc * (J_Tci_pfci * J_x_Tc);
 
       // PO-KF: if extrinsic is added to state, then add it to jacobian also
       if (state->_options.do_calib_camera_pose) {
