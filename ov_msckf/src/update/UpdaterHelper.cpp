@@ -191,6 +191,7 @@ void UpdaterHelper::get_feature_jacobian_representation(std::shared_ptr<State> s
 
 void UpdaterHelper::get_feature_jacobian_full(std::shared_ptr<State> state, UpdaterHelperFeature &feature,
                                               Eigen::MatrixXd &H_x, Eigen::VectorXd &res, std::vector<std::shared_ptr<Type>> &x_order) {
+
   // Total number of measurements for this feature
   int total_meas = 0;
   for (auto const &pair : feature.timestamps) {
@@ -201,6 +202,7 @@ void UpdaterHelper::get_feature_jacobian_full(std::shared_ptr<State> state, Upda
   int total_hx = 0;
   std::unordered_map<std::shared_ptr<Type>, size_t> map_hx;
   for (auto const &pair : feature.timestamps) {
+
     // Our extrinsics and intrinsics
     std::shared_ptr<PoseJPL> calibration = state->_calib_IMUtoCAM.at(pair.first);
     std::shared_ptr<Vec> distortion = state->_cam_intrinsics.at(pair.first);
@@ -221,6 +223,7 @@ void UpdaterHelper::get_feature_jacobian_full(std::shared_ptr<State> state, Upda
 
     // Loop through all measurements for this specific camera
     for (size_t m = 0; m < feature.timestamps[pair.first].size(); m++) {
+
       // Add this clone if it is not added already
       std::shared_ptr<PoseJPL> clone_Ci = state->_clones_IMU.at(feature.timestamps[pair.first].at(m));
       if (map_hx.find(clone_Ci) == map_hx.end()) {
@@ -288,16 +291,16 @@ void UpdaterHelper::get_feature_jacobian_full(std::shared_ptr<State> state, Upda
 
   // Allocate our residual and Jacobians
   int c = 0;
-  int jacobsize = (feature.feat_representation != LandmarkRepresentation::Representation::ANCHORED_INVERSE_DEPTH_SINGLE) ? 3 : 1;
+  // int jacobsize = (feature.feat_representation != LandmarkRepresentation::Representation::ANCHORED_INVERSE_DEPTH_SINGLE) ? 3 : 1;
+  // PO-KF: we subtract 4 from total size, because we are skipping left and rightbaseframes in jacobian calculation 
   res = Eigen::VectorXd::Zero(2 * total_meas - 2*2);
-  // std::cout << total_hx * 1.0 / (clone_Ci->size()*1.0) << ", " << clone_Ci->size() << ", " << state->_clones_IMU.size() << "\n";
   H_x = Eigen::MatrixXd::Zero(2 * total_meas - 2*2, total_hx);
 
   // Derivative of p_FinG in respect to feature representation.
   // This only needs to be computed once and thus we pull it out of the loop
   Eigen::MatrixXd dpfg_dlambda;
-  std::vector<Eigen::MatrixXd> dpfg_dx; // empty in our case
-  std::vector<std::shared_ptr<Type>> dpfg_dx_order; // empty in our case
+  std::vector<Eigen::MatrixXd> dpfg_dx; // PO-KF: empty in our case
+  std::vector<std::shared_ptr<Type>> dpfg_dx_order; // PO-KF: empty in our case
   UpdaterHelper::get_feature_jacobian_representation(state, feature, dpfg_dlambda, dpfg_dx, dpfg_dx_order);
 
   // Assert that all the ones in our order are already in our local jacobian mapping
@@ -351,8 +354,8 @@ void UpdaterHelper::get_feature_jacobian_full(std::shared_ptr<State> state, Upda
     // precompute some matrices
     Eigen::MatrixXd R_GtoCright = T_GinCright.linear();
     Eigen::MatrixXd R_GtoCleft = T_GinCleft.linear();
-    Eigen::Vector3d p_CleftinG = T_GinCleft.inverse().translation();
-    Eigen::Vector3d p_CrightinG = T_GinCright.inverse().translation();
+    // Eigen::Vector3d p_CleftinG = T_GinCleft.inverse().translation();
+    // Eigen::Vector3d p_CrightinG = T_GinCright.inverse().translation();
     Eigen::Isometry3d T_CleftinCright = T_GinCright * T_GinCleft.inverse();
 
     // Jacobian of the feature depth to camera poses (eq_51)
@@ -389,7 +392,7 @@ void UpdaterHelper::get_feature_jacobian_full(std::shared_ptr<State> state, Upda
       
     Eigen::Matrix<double, 6, 6> J_x_Tc_right;
     J_x_Tc_right << R_ItoC, Eigen::Matrix3d::Zero(), -1.0 * R_GtoIright.transpose() * skew_x(T_ItoC.inverse().translation()), Eigen::Matrix3d::Identity();
-      
+
     // Loop through all measurements for this specific camera
     for (size_t m = 0; m < feature.timestamps[pair.first].size(); m++) {
 
@@ -420,17 +423,13 @@ void UpdaterHelper::get_feature_jacobian_full(std::shared_ptr<State> state, Upda
       uv_norm << p_FinCi(0) / p_FinCi(2), p_FinCi(1) / p_FinCi(2);
 
       // Distort the normalized coordinates (radtan or fisheye)
-      // Eigen::Vector2d uv_dist;
-      // uv_dist = state->_cam_intrinsics_cameras.at(pair.first)->distort_d(uv_norm);
+      Eigen::Vector2d uv_dist;
+      uv_dist = state->_cam_intrinsics_cameras.at(pair.first)->distort_d(uv_norm);
 
       // Our residual
       Eigen::Vector2d uv_m;
-      Eigen::Vector3d uv_norm_measured;
-      uv_norm_measured << (double)feature.uvs_norm[pair.first].at(m)(0), (double)feature.uvs_norm[pair.first].at(m)(1), 1;
-      uv_norm_measured /= uv_norm_measured.norm();
-      uv_norm_measured /= uv_norm_measured(2);
-      uv_m << uv_norm_measured(0), uv_norm_measured(1);
-      res.block(2 * c, 0, 2, 1) = uv_m - uv_norm;
+      uv_m << (double)feature.uvs[pair.first].at(m)(0), (double)feature.uvs[pair.first].at(m)(1);
+      res.block(2 * c, 0, 2, 1) = uv_m - uv_dist;
 
       //=========================================================================
       //=========================================================================
@@ -474,11 +473,32 @@ void UpdaterHelper::get_feature_jacobian_full(std::shared_ptr<State> state, Upda
       // Jacobian of the feature depth to camera pose
       // Eigen::Matrix<double, 2, 6> H_x_eta;
       
-      H_x.block(2 * c, map_hx[clone_Ileft], 2, clone_Ileft->size()).noalias() = dzn_dpfc * (J_dfleft_pfci * (J_TCleft_dfleft * J_x_Tc_left) + J_Tcleft_pfci * J_x_Tc_left);
+      H_x.block(2 * c, map_hx[clone_Ileft], 2, clone_Ileft->size()).noalias() = dz_dzn * dzn_dpfc * (J_dfleft_pfci * (J_TCleft_dfleft * J_x_Tc_left) + J_Tcleft_pfci * J_x_Tc_left);
 
-      H_x.block(2 * c, map_hx[clone_Iright], 2, clone_Iright->size()).noalias() = dzn_dpfc * (J_dfleft_pfci * (J_TCright_dfleft * J_x_Tc_right));
+      H_x.block(2 * c, map_hx[clone_Iright], 2, clone_Iright->size()).noalias() = dz_dzn * dzn_dpfc * (J_dfleft_pfci * (J_TCright_dfleft * J_x_Tc_right));
       
-      H_x.block(2 * c, map_hx[clone_Ii], 2, clone_Ii->size()).noalias() = dzn_dpfc * (J_Tci_pfci * J_x_Tc);
+      H_x.block(2 * c, map_hx[clone_Ii], 2, clone_Ii->size()).noalias() = dz_dzn * dzn_dpfc * (J_Tci_pfci * J_x_Tc);
+
+      // PO-KF: if extrinsic is added to state, then add it to jacobian also
+      if (state->_options.do_calib_camera_pose) {
+        Eigen::MatrixXd dpfcleft_dcalib = Eigen::MatrixXd::Zero(6, 6);
+        dpfcleft_dcalib.block(0, 0, 3, 3) = Eigen::Matrix<double, 3, 3>::Identity();
+        dpfcleft_dcalib.block(3, 0, 3, 3) = R_GtoCleft.transpose() * skew_x(p_IinC);
+        dpfcleft_dcalib.block(3, 3, 3, 3) = -1.0 * R_GtoCleft.transpose();
+
+        Eigen::MatrixXd dpfcright_dcalib = Eigen::MatrixXd::Zero(6, 6);
+        dpfcright_dcalib.block(0, 0, 3, 3) = Eigen::Matrix<double, 3, 3>::Identity();
+        dpfcright_dcalib.block(3, 0, 3, 3) = R_GtoCright.transpose() * skew_x(p_IinC);
+        dpfcright_dcalib.block(3, 3, 3, 3) = -1.0 * R_GtoCright.transpose();
+
+        Eigen::MatrixXd dpfci_dcalib = Eigen::MatrixXd::Zero(6, 6);
+        dpfci_dcalib.block(0, 0, 3, 3) = Eigen::Matrix<double, 3, 3>::Identity();
+        dpfci_dcalib.block(3, 0, 3, 3) = T_GinCi.linear().transpose() * skew_x(p_IinC);
+        dpfci_dcalib.block(3, 3, 3, 3) = -1.0 * T_GinCi.linear().transpose();
+
+        H_x.block(2 * c, map_hx[calibration], 2, calibration->size()).noalias() = 
+                      dz_dzn * dzn_dpfc * (J_dfleft_pfci * (J_TCleft_dfleft * dpfcleft_dcalib + J_TCright_dfleft * dpfcright_dcalib) + J_Tcleft_pfci * dpfcleft_dcalib + J_Tci_pfci * dpfci_dcalib);
+      }
 
       // CHAINRULE: loop through all extra states and add their
       // NOTE: we add the Jacobian here as we might be in the anchoring pose for this measurement
@@ -486,25 +506,10 @@ void UpdaterHelper::get_feature_jacobian_full(std::shared_ptr<State> state, Upda
       //   H_x.block(2 * c, map_hx[dpfg_dx_order.at(i)], 2, dpfg_dx_order.at(i)->size()).noalias() += dz_dpfg * dpfg_dx.at(i);
       // }
 
-      //=========================================================================
-      //=========================================================================
-
-      // Derivative of p_FinCi in respect to camera calibration (R_ItoC, p_IinC)
-      // if (state->_options.do_calib_camera_pose) {
-
-      //   // Calculate the Jacobian
-      //   Eigen::MatrixXd dpfc_dcalib = Eigen::MatrixXd::Zero(3, 6);
-      //   dpfc_dcalib.block(0, 0, 3, 3) = skew_x(p_FinCi - p_IinC);
-      //   dpfc_dcalib.block(0, 3, 3, 3) = Eigen::Matrix<double, 3, 3>::Identity();
-
-      //   // Chainrule it and add it to the big jacobian
-      //   H_x.block(2 * c, map_hx[calibration], 2, calibration->size()).noalias() += dz_dpfc * dpfc_dcalib;
-      // }
-
-      // // Derivative of measurement in respect to distortion parameters
-      // if (state->_options.do_calib_camera_intrinsics) {
-      //   H_x.block(2 * c, map_hx[distortion], 2, distortion->size()) = dz_dzeta;
-      // }
+      // Derivative of measurement in respect to distortion parameters
+      if (state->_options.do_calib_camera_intrinsics) {
+        H_x.block(2 * c, map_hx[distortion], 2, distortion->size()) = dz_dzeta;
+      }
 
       // Move the Jacobian and residual index forward
       c++;

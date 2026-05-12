@@ -42,8 +42,7 @@ using namespace ov_msckf;
 UpdaterMSCKF::UpdaterMSCKF(UpdaterOptions &options, ov_core::FeatureInitializerOptions &feat_init_options) : _options(options) {
 
   // Save our raw pixel noise squared
-  double new_sigma = _options.sigma_pix / 460.0;
-  _options.sigma_pix_sq = std::pow(new_sigma, 2);
+  _options.sigma_pix_sq = std::pow(_options.sigma_pix, 2);
 
   // Save our feature initializer
   initializer_feat = std::shared_ptr<ov_core::FeatureInitializer>(new ov_core::FeatureInitializer(feat_init_options));
@@ -128,11 +127,6 @@ void UpdaterMSCKF::update(std::shared_ptr<State> state, std::vector<std::shared_
       success_tri = initializer_feat->po_pose_calculation(*it1, clones_cam);
     }
 
-    // Gauss-newton refine the feature
-    bool success_refine = true;
-    // if (initializer_feat->config().refine_features) {
-    //   success_refine = initializer_feat->single_gaussnewton(*it1, clones_cam);
-    // }
 
     // Remove the feature if not a success
     if (!success_tri) {
@@ -208,9 +202,6 @@ void UpdaterMSCKF::update(std::shared_ptr<State> state, std::vector<std::shared_
     // Get the Jacobian for this feature
     // UpdaterHelper::get_feature_jacobian_full(state, feat, H_f, H_x, res, Hx_order);
     UpdaterHelper::get_feature_jacobian_full(state, feat, H_x, res, Hx_order);
-    // std::cout << "res min and max: " << res.minCoeff() << ", " << res.maxCoeff() << "\n";
-    // std::cout << "Hx min and max: " << H_x.minCoeff() << ", " << H_x.maxCoeff() << "\n";
-    // std::cout << Hx_order.size() << "\n";
 
     // Nullspace project
     // UpdaterHelper::nullspace_project_inplace(H_f, H_x, res);
@@ -230,6 +221,7 @@ void UpdaterMSCKF::update(std::shared_ptr<State> state, std::vector<std::shared_
       chi2_check = boost::math::quantile(chi_squared_dist, 0.95);
       PRINT_WARNING(YELLOW "chi2_check over the residual limit - %d\n" RESET, (int)res.rows());
     }
+
     // Check if we should delete or not
     if (chi2 > _options.chi2_multipler * chi2_check) {
       (*it2)->to_delete = true;
@@ -241,8 +233,6 @@ void UpdaterMSCKF::update(std::shared_ptr<State> state, std::vector<std::shared_
       // PRINT_DEBUG(ss.str().c_str());
       continue;
     }
-
-    // std::cout << "chi2 test passed\n";
 
     // We are good!!! Append to our large H vector
     size_t ct_hx = 0;
@@ -283,7 +273,7 @@ void UpdaterMSCKF::update(std::shared_ptr<State> state, std::vector<std::shared_
   Hx_big.conservativeResize(ct_meas, ct_jacob);
 
   // 5. Perform measurement compression
-  // UpdaterHelper::measurement_compress_inplace(Hx_big, res_big);
+  UpdaterHelper::measurement_compress_inplace(Hx_big, res_big);
   if (Hx_big.rows() < 1) {
     return;
   }

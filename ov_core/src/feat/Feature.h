@@ -76,8 +76,6 @@ public:
   /// Triangulated position of this feature, in the global frame
   Eigen::Vector3d p_FinG;
 
-  Eigen::Vector3d p_FinG_po;
-
   /**
    * @brief Remove measurements that do not occur at passed timestamps.
    *

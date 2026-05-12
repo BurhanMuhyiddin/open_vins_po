@@ -108,9 +108,6 @@ bool FeatureInitializer::single_triangulation(std::shared_ptr<Feature> feat,
   // Store it in our feature object
   feat->p_FinA = p_f;
   feat->p_FinG = R_GtoA.transpose() * feat->p_FinA + p_AinG;
-
-  // Eigen::Vector3d p_norm = feat->p_FinG / feat->p_FinG(2);
-  // std::cout << "Global position is original: " << feat->p_FinG.transpose() << "\n";
   return true;
 }
 
@@ -445,6 +442,7 @@ bool FeatureInitializer::po_pose_calculation(std::shared_ptr<Feature> feat,
   f_Ci /= f_Ci(2);
   Eigen::Matrix< double, 3, 1 > P_Ci = clonesCAM.at(cam_id).at(feat->baseframes.left_baseframe_timestamp).pos();
   Eigen::Matrix< double, 3, 3 >  R_Ci = clonesCAM.at(cam_id).at(feat->baseframes.left_baseframe_timestamp).Rot().transpose();
+  
   Eigen::Matrix< double, 3, 1 > f_Cj;
   f_Cj << feat->uvs_norm.at(cam_id)[feat->baseframes.right_baseframe_index](0), feat->uvs_norm.at(cam_id)[feat->baseframes.right_baseframe_index](1), 1;
   f_Cj /= f_Cj.norm();
@@ -516,11 +514,12 @@ bool FeatureInitializer::baseframes_selection(std::shared_ptr<Feature> feat,
 
   for (size_t j = 1; j < feat->timestamps.at(cam_id).size()-1; j++)
   {
-    double timestamp_j = feat->timestamps.at(cam_id)[j];
     Eigen::Matrix< double, 3, 1 > f_Cj;
     f_Cj << feat->uvs_norm.at(cam_id)[j](0), feat->uvs_norm.at(cam_id)[j](1), 1;
     f_Cj /= f_Cj.norm();
     f_Cj /= f_Cj(2);
+    
+    double timestamp_j = feat->timestamps.at(cam_id)[j];
     Eigen::Matrix< double, 3, 3 > R_Cj = clonesCAM.at(cam_id).at(timestamp_j).Rot().transpose();
 
     Eigen::Matrix< double, 3, 3 > R_Cj_Ci = R_Cj.transpose() * R_Ci;
