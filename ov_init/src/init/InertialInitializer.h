@@ -24,6 +24,10 @@
 
 #include "init/InertialInitializerOptions.h"
 
+#include "drt/drtLooselyCoupled.h"
+#include "drt/imuPreintegrated.hpp"
+#include "drt/basicTypes.hpp"
+
 namespace ov_core {
 class FeatureDatabase;
 struct ImuData;
@@ -112,6 +116,11 @@ protected:
 
   /// Dynamic initialization helper class
   std::shared_ptr<DynamicInitializer> init_dynamic;
+
+  DRT::drtLooselyCoupled::Ptr pDrtVioInit;
+  bool init_feature = true;
+  bool is_resetted = false;
+  std::vector<double> keyframe_timestamps;
 };
 
 } // namespace ov_init

@@ -27,6 +27,7 @@ include_directories(
         ${Boost_INCLUDE_DIRS}
         ${CERES_INCLUDE_DIRS}
         ${catkin_INCLUDE_DIRS}
+        ${CMAKE_SOURCE_DIR}/3rdparty/Sophus
 )
 
 # Set link libraries used by all binaries
@@ -70,8 +71,14 @@ list(APPEND LIBRARY_SOURCES
         src/dynamic/DynamicInitializer.cpp
         src/static/StaticInitializer.cpp
         src/sim/SimulatorInit.cpp
+        src/drt/basicTypes.cpp
+        src/drt/drtLooselyCoupled.cpp
+        src/drt/drtVioInit.cpp
+        src/drt/imuPreintegrated.cpp
+        src/drt/polynomial.cpp
 )
 file(GLOB_RECURSE LIBRARY_HEADERS "src/*.h")
+file(GLOB_RECURSE LIBRARY_HEADERS "src/*.hpp")
 add_library(ov_init_lib SHARED ${LIBRARY_SOURCES} ${LIBRARY_HEADERS})
 target_link_libraries(ov_init_lib ${thirdparty_libraries})
 target_include_directories(ov_init_lib PUBLIC src/)

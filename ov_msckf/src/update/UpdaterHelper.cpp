@@ -292,6 +292,7 @@ void UpdaterHelper::get_feature_jacobian_full(std::shared_ptr<State> state, Upda
   // Allocate our residual and Jacobians
   int c = 0;
   // int jacobsize = (feature.feat_representation != LandmarkRepresentation::Representation::ANCHORED_INVERSE_DEPTH_SINGLE) ? 3 : 1;
+  // PO-KF: we subtract 4 from total size, because we are skipping left and rightbaseframes in jacobian calculation 
   res = Eigen::VectorXd::Zero(2 * total_meas);
   H_x = Eigen::MatrixXd::Zero(2 * total_meas, total_hx);
 
@@ -400,11 +401,11 @@ void UpdaterHelper::get_feature_jacobian_full(std::shared_ptr<State> state, Upda
 
       // Get current IMU clone state (k)
       std::shared_ptr<PoseJPL> clone_Ii = state->_clones_IMU.at(feature.timestamps[pair.first].at(m));
-      if (clone_Ii == clone_Ileft || clone_Ii == clone_Iright)
-      {
-        // c++;
-        continue;
-      }
+      // if (clone_Ii == clone_Ileft || clone_Ii == clone_Iright)
+      // {
+      //   // c++;
+      //   continue;
+      // }
 
       Eigen::Matrix3d R_GtoIi = clone_Ii->Rot();
       Eigen::Vector3d p_IiinG = clone_Ii->pos();
