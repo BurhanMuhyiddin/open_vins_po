@@ -28,7 +28,6 @@ include_directories(
         ${Boost_INCLUDE_DIRS}
         ${CERES_INCLUDE_DIRS}
         ${catkin_INCLUDE_DIRS}
-        ${CMAKE_SOURCE_DIR}/../ov_init/3rdparty/Sophus
 )
 
 # Set link libraries used by all binaries
@@ -158,5 +157,4 @@ install(TARGETS test_sim_repeat
         LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
         RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
-
 

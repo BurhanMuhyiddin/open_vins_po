@@ -126,17 +126,17 @@ void UpdaterSLAM::delayed_init(std::shared_ptr<State> state, std::vector<std::sh
     if (initializer_feat->config().triangulate_1d) {
       success_tri = initializer_feat->single_triangulation_1d(*it1, clones_cam);
     } else {
-      success_tri = initializer_feat->po_pose_calculation(*it1, clones_cam);
+      success_tri = initializer_feat->single_triangulation(*it1, clones_cam);
     }
 
     // Gauss-newton refine the feature
-    // bool success_refine = true;
-    // if (initializer_feat->config().refine_features) {
-    //   success_refine = initializer_feat->single_gaussnewton(*it1, clones_cam);
-    // }
+    bool success_refine = true;
+    if (initializer_feat->config().refine_features) {
+      success_refine = initializer_feat->single_gaussnewton(*it1, clones_cam);
+    }
 
     // Remove the feature if not a success
-    if (!success_tri) {
+    if (!success_tri || !success_refine) {
       (*it1)->to_delete = true;
       it1 = feature_vec.erase(it1);
       continue;
@@ -182,7 +182,7 @@ void UpdaterSLAM::delayed_init(std::shared_ptr<State> state, std::vector<std::sh
     std::vector<std::shared_ptr<Type>> Hx_order;
 
     // Get the Jacobian for this feature
-    // UpdaterHelper::get_feature_jacobian_full(state, feat, H_f, H_x, res, Hx_order);
+    UpdaterHelper::get_feature_jacobian_full(state, feat, H_f, H_x, res, Hx_order);
 
     // If we are doing the single feature representation, then we need to remove the bearing portion
     // To do so, we project the bearing portion onto the state and depth Jacobians and the residual.
@@ -359,7 +359,7 @@ void UpdaterSLAM::update(std::shared_ptr<State> state, std::vector<std::shared_p
     std::vector<std::shared_ptr<Type>> Hx_order;
 
     // Get the Jacobian for this feature
-    // UpdaterHelper::get_feature_jacobian_full(state, feat, H_f, H_x, res, Hx_order);
+    UpdaterHelper::get_feature_jacobian_full(state, feat, H_f, H_x, res, Hx_order);
 
     // Place Jacobians in one big Jacobian, since the landmark is already in our state vector
     Eigen::MatrixXd H_xf = H_x;

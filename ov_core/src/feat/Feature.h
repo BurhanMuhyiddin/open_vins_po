@@ -39,18 +39,8 @@ namespace ov_core {
 class Feature {
 
 public:
-  struct BaseFrames {
-    size_t left_baseframe_index;
-    size_t right_baseframe_index;
-    double left_baseframe_timestamp;
-    double right_baseframe_timestamp;
-  };
-
   /// Unique ID of this feature
   size_t featid;
-
-  /// BaseFrames of the feature to do pose only depth calculation
-  BaseFrames baseframes;
 
   /// If this feature should be deleted
   bool to_delete;

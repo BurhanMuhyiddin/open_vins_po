@@ -123,13 +123,17 @@ void UpdaterMSCKF::update(std::shared_ptr<State> state, std::vector<std::shared_
     if (initializer_feat->config().triangulate_1d) {
       success_tri = initializer_feat->single_triangulation_1d(*it1, clones_cam);
     } else {
-      // success_tri = initializer_feat->single_triangulation(*it1, clones_cam);
-      success_tri = initializer_feat->po_pose_calculation(*it1, clones_cam);
+      success_tri = initializer_feat->single_triangulation(*it1, clones_cam);
     }
 
+    // Gauss-newton refine the feature
+    bool success_refine = true;
+    if (initializer_feat->config().refine_features) {
+      success_refine = initializer_feat->single_gaussnewton(*it1, clones_cam);
+    }
 
     // Remove the feature if not a success
-    if (!success_tri) {
+    if (!success_tri || !success_refine) {
       (*it1)->to_delete = true;
       it1 = feature_vec.erase(it1);
       continue;
@@ -171,10 +175,6 @@ void UpdaterMSCKF::update(std::shared_ptr<State> state, std::vector<std::shared_
     feat.uvs = (*it2)->uvs;
     feat.uvs_norm = (*it2)->uvs_norm;
     feat.timestamps = (*it2)->timestamps;
-    feat.baseframes.left_baseframe_index =      (*it2)->baseframes.left_baseframe_index;
-    feat.baseframes.right_baseframe_index =     (*it2)->baseframes.right_baseframe_index;
-    feat.baseframes.left_baseframe_timestamp =  (*it2)->baseframes.left_baseframe_timestamp;
-    feat.baseframes.right_baseframe_timestamp =  (*it2)->baseframes.right_baseframe_timestamp;
 
     // If we are using single inverse depth, then it is equivalent to using the msckf inverse depth
     feat.feat_representation = state->_options.feat_rep_msckf;
@@ -200,11 +200,10 @@ void UpdaterMSCKF::update(std::shared_ptr<State> state, std::vector<std::shared_
     std::vector<std::shared_ptr<Type>> Hx_order;
 
     // Get the Jacobian for this feature
-    // UpdaterHelper::get_feature_jacobian_full(state, feat, H_f, H_x, res, Hx_order);
-    UpdaterHelper::get_feature_jacobian_full(state, feat, H_x, res, Hx_order);
+    UpdaterHelper::get_feature_jacobian_full(state, feat, H_f, H_x, res, Hx_order);
 
     // Nullspace project
-    // UpdaterHelper::nullspace_project_inplace(H_f, H_x, res);
+    UpdaterHelper::nullspace_project_inplace(H_f, H_x, res);
 
     /// Chi2 distance check
     Eigen::MatrixXd P_marg = StateHelper::get_marginal_covariance(state, Hx_order);

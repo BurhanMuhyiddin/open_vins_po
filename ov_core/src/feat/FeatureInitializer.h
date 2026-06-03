@@ -100,18 +100,6 @@ public:
   bool single_triangulation(std::shared_ptr<Feature> feat, std::unordered_map<size_t, std::unordered_map<double, ClonePose>> &clonesCAM);
 
   /**
-   * @brief Pose initialization for a feature based on PO theory
-   *
-   * The derivations for this method can be found in https://arxiv.org/pdf/2407.01888.
-   *
-   * @param feat Pointer to feature
-   * @param clonesCAM Map between camera ID to map of timestamp to camera pose estimate (rotation from global to camera, position of camera
-   * in global frame)
-   * @return Returns false if it fails to calculate pose
-   */
-  bool po_pose_calculation(std::shared_ptr<Feature> feat, std::unordered_map<size_t, std::unordered_map<double, ClonePose>> &clonesCAM);
-
-  /**
    * @brief Uses a linear triangulation to get initial estimate for the feature, treating the anchor observation as a true bearing.
    *
    * The derivations for this method can be found in the @ref featinit-linear-1d documentation page.
@@ -153,19 +141,6 @@ protected:
    */
   double compute_error(std::unordered_map<size_t, std::unordered_map<double, ClonePose>> &clonesCAM, std::shared_ptr<Feature> feat,
                        double alpha, double beta, double rho);
-
-  /**
-  * @brief Calculates base frames for the given feature track
-  *
-  * The derivations for this method can be found in https://arxiv.org/pdf/2407.01888.
-  *
-  * @param feat Pointer to feature
-  * @param clonesCAM Map between camera ID to map of timestamp to camera pose estimate (rotation from global to camera, position of camera
-  * in global frame)
-  * @return Returns false if it fails to calculate baseframes
-  */
-  bool baseframes_selection(std::shared_ptr<Feature> feat,
-                            std::unordered_map<size_t, std::unordered_map<double, ClonePose>> &clonesCAM);
 };
 
 } // namespace ov_core
