@@ -438,15 +438,15 @@ bool FeatureInitializer::po_pose_calculation(std::shared_ptr<Feature> feat,
   constexpr size_t cam_id = 0;
   Eigen::Matrix< double, 3, 1 > f_Ci;
   f_Ci << feat->uvs_norm.at(cam_id)[feat->baseframes.left_baseframe_index](0), feat->uvs_norm.at(cam_id)[feat->baseframes.left_baseframe_index](1), 1;
-  f_Ci /= f_Ci.norm();
-  f_Ci /= f_Ci(2);
+  // f_Ci /= f_Ci.norm();
+  // f_Ci /= f_Ci(2);
   Eigen::Matrix< double, 3, 1 > P_Ci = clonesCAM.at(cam_id).at(feat->baseframes.left_baseframe_timestamp).pos();
   Eigen::Matrix< double, 3, 3 >  R_Ci = clonesCAM.at(cam_id).at(feat->baseframes.left_baseframe_timestamp).Rot().transpose();
   
   Eigen::Matrix< double, 3, 1 > f_Cj;
   f_Cj << feat->uvs_norm.at(cam_id)[feat->baseframes.right_baseframe_index](0), feat->uvs_norm.at(cam_id)[feat->baseframes.right_baseframe_index](1), 1;
-  f_Cj /= f_Cj.norm();
-  f_Cj /= f_Cj(2);
+  // f_Cj /= f_Cj.norm();
+  // f_Cj /= f_Cj(2);
   Eigen::Matrix< double, 3, 1 > P_Cj = clonesCAM.at(cam_id).at(feat->baseframes.right_baseframe_timestamp).pos();
   Eigen::Matrix< double, 3, 3 >  R_Cj = clonesCAM.at(cam_id).at(feat->baseframes.right_baseframe_timestamp).Rot().transpose();
   Eigen::Matrix< double, 3, 3 >  R_Cj_Ci = R_Cj.transpose() * R_Ci;
@@ -496,12 +496,13 @@ bool FeatureInitializer::baseframes_selection(std::shared_ptr<Feature> feat,
   // get normalized feature coordinate and it's camera pose for left_baseframe and current frame
   Eigen::Matrix< double, 3, 1 > f_Ci;
   f_Ci << feat->uvs_norm.at(cam_id)[left_baseframe_index](0), feat->uvs_norm.at(cam_id)[left_baseframe_index](1), 1;
-  f_Ci /= f_Ci.norm();
-  f_Ci /= f_Ci(2);
+  // f_Ci /= f_Ci.norm();
+  // f_Ci /= f_Ci(2);
   Eigen::Matrix< double, 3, 3 > R_Ci = clonesCAM.at(cam_id).at(left_baseframe_timestamp).Rot().transpose();
   Eigen::Matrix< double, 3, 1 > f_Ck;
   f_Ck << feat->uvs_norm.at(cam_id)[current_frame_index](0), feat->uvs_norm.at(cam_id)[current_frame_index](1), 1;
-  f_Ck /= f_Ck(2);
+  // f_Ck /= f_Ck.norm();
+  // f_Ck /= f_Ck(2);
   Eigen::Matrix< double, 3, 3 > R_Ck = clonesCAM.at(cam_id).at(current_frame_timestamp).Rot().transpose();
 
   Eigen::Matrix< double, 3, 3 > R_Ci_Ck = R_Ci.transpose() * R_Ck;
@@ -516,8 +517,8 @@ bool FeatureInitializer::baseframes_selection(std::shared_ptr<Feature> feat,
   {
     Eigen::Matrix< double, 3, 1 > f_Cj;
     f_Cj << feat->uvs_norm.at(cam_id)[j](0), feat->uvs_norm.at(cam_id)[j](1), 1;
-    f_Cj /= f_Cj.norm();
-    f_Cj /= f_Cj(2);
+    // f_Cj /= f_Cj.norm();
+    // f_Cj /= f_Cj(2);
     
     double timestamp_j = feat->timestamps.at(cam_id)[j];
     Eigen::Matrix< double, 3, 3 > R_Cj = clonesCAM.at(cam_id).at(timestamp_j).Rot().transpose();
@@ -540,7 +541,7 @@ bool FeatureInitializer::baseframes_selection(std::shared_ptr<Feature> feat,
     }
   }
 
-  if (max_parallax < 1.0e-8)
+  if (max_parallax < 1.0e-12)
   {
     PRINT_DEBUG("parallax is near 0, max_parallax: %.4f", max_parallax);
     return false;

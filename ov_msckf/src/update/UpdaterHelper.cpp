@@ -333,7 +333,7 @@ void UpdaterHelper::get_feature_jacobian_full(std::shared_ptr<State> state, Upda
     // get normalized fature coordinate in left baseframe (i)
     Eigen::Matrix< double, 3, 1 > f_Cleft;
     f_Cleft << feature.uvs_norm.at(pair.first)[feature.baseframes.left_baseframe_index](0), feature.uvs_norm.at(pair.first)[feature.baseframes.left_baseframe_index](1), 1;
-    f_Cleft /= f_Cleft.norm();
+    // f_Cleft /= f_Cleft.norm();
     // f_Cleft /= f_Cleft(2);
 
     // get pose of right base frame (j)
@@ -348,7 +348,7 @@ void UpdaterHelper::get_feature_jacobian_full(std::shared_ptr<State> state, Upda
     // get normalized fature coordinate in right baseframe (j)
     Eigen::Matrix< double, 3, 1 > f_Cright;
     f_Cright << feature.uvs_norm.at(pair.first)[feature.baseframes.right_baseframe_index](0), feature.uvs_norm.at(pair.first)[feature.baseframes.right_baseframe_index](1), 1;
-    f_Cright /= f_Cright.norm();
+    // f_Cright /= f_Cright.norm();
     // f_Cright /= f_Cright(2);
 
     // precompute some matrices

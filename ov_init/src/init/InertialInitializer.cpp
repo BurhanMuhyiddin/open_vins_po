@@ -327,7 +327,7 @@ bool InertialInitializer::initialize(double &timestamp, Eigen::MatrixXd &covaria
   // imu_state.block(0, 0, 4, 1) = rot_2_quat(pDrtVioInit->rotation.back().transpose() * R_aligning);
   Eigen::Matrix3d R_GtoI = pDrtVioInit->rotation.back().transpose() * R_aligning; 
   imu_state.block(0, 0, 4, 1) = rot_2_quat(R_GtoI);
-  imu_state.block(4, 0, 3, 1) = R_aligning.transpose() * pDrtVioInit->position.back();
+  // imu_state.block(4, 0, 3, 1) = R_aligning.transpose() * pDrtVioInit->position.back();
   imu_state.block(7, 0, 3, 1) = R_aligning.transpose() * pDrtVioInit->velocity.back();
   imu_state.block(10, 0, 3, 1) = bg;
   imu_state.block(13, 0, 3, 1) = ba;
@@ -344,12 +344,6 @@ bool InertialInitializer::initialize(double &timestamp, Eigen::MatrixXd &covaria
   covariance.block(6, 6, 3, 3) = std::pow(0.20, 2) * Eigen::Matrix3d::Identity(); // v (static)
   covariance.block(9, 9, 3, 3) = std::pow(0.01, 2) * Eigen::Matrix3d::Identity();
   covariance.block(12, 12, 3, 3) = std::pow(0.30, 2) * Eigen::Matrix3d::Identity();
-
-  // _db->cleanup_measurements(timestamp);
-  // auto it_imu = imu_data->begin();
-  // while (it_imu != imu_data->end() && it_imu->timestamp < timestamp + params.calib_camimu_dt) {
-  //   it_imu = imu_data->erase(it_imu);
-  // }
 
   timestamp += params.calib_camimu_dt;
 
