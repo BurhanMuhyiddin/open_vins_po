@@ -321,35 +321,51 @@ void UpdaterHelper::get_feature_jacobian_full(std::shared_ptr<State> state, Upda
     T_ItoC.translation() = p_IinC;
     T_ItoC.linear() = R_ItoC;
 
-    // get pose of left base frame (i)
+    // get clone pointers and normalized measurements for the two base frames (i=left, j=right)
     std::shared_ptr<PoseJPL> clone_Ileft = state->_clones_IMU.at(feature.timestamps[pair.first].at(feature.baseframes.left_baseframe_index));
-    Eigen::Matrix3d R_GtoIleft = clone_Ileft->Rot();
-    Eigen::Vector3d p_IleftinG = clone_Ileft->pos();
+    std::shared_ptr<PoseJPL> clone_Iright = state->_clones_IMU.at(feature.timestamps[pair.first].at(feature.baseframes.right_baseframe_index));
+    Eigen::Matrix< double, 3, 1 > f_Cleft;
+    f_Cleft << feature.uvs_norm.at(pair.first)[feature.baseframes.left_baseframe_index](0), feature.uvs_norm.at(pair.first)[feature.baseframes.left_baseframe_index](1), 1;
+    Eigen::Matrix< double, 3, 1 > f_Cright;
+    f_Cright << feature.uvs_norm.at(pair.first)[feature.baseframes.right_baseframe_index](0), feature.uvs_norm.at(pair.first)[feature.baseframes.right_baseframe_index](1), 1;
+
+    // PO-KF FEJ conditioning guard (per feature).
+    // The pose-only depth Jacobian magnitude scales like 1/A_p_norm, where A_p is the
+    // TRANSLATIONAL parallax between the two base frames. When the platform is ~stationary
+    // A_p_norm -> 0, so df_left = A_p_norm/B_p_norm is ill-conditioned. With FEJ this couples
+    // a huge frozen Jacobian to a current-estimate residual -> the mismatch is amplified and
+    // the filter diverges (this is exactly MH_04's stationary stretch, where ZUPT is off).
+    // Detect the degenerate geometry from the CURRENT estimate and, only for such features,
+    // fall back to the current-estimate linearization (i.e. behave like FEJ-off for this one
+    // feature). Well-conditioned features keep full FEJ, and FEJ-off itself is untouched.
+    bool use_fej_here = state->_options.do_fej;
+    if (use_fej_here) {
+      Eigen::Isometry3d T_IlG_c; T_IlG_c.translation() = clone_Ileft->pos();  T_IlG_c.linear() = clone_Ileft->Rot().transpose();
+      Eigen::Isometry3d T_IrG_c; T_IrG_c.translation() = clone_Iright->pos(); T_IrG_c.linear() = clone_Iright->Rot().transpose();
+      Eigen::Isometry3d T_LR_c = (T_ItoC * T_IrG_c.inverse()) * (T_ItoC * T_IlG_c.inverse()).inverse();
+      double Ap_c = (skew_x(f_Cright) * T_LR_c.translation()).norm();
+      double Bp_c = (skew_x(f_Cright) * T_LR_c.linear() * f_Cleft).norm();
+      double depth_c = (Bp_c > 1e-9) ? Ap_c / Bp_c : 0.0;
+      const double MIN_DEPTH = 0.5, MAX_DEPTH = 60.0;   // physical depth range [m]
+      if (Bp_c < 1e-9 || depth_c < MIN_DEPTH || depth_c > MAX_DEPTH)
+        use_fej_here = false;
+    }
+
+    // get pose of left base frame (i) -- first-estimate point only when well-conditioned
+    Eigen::Matrix3d R_GtoIleft = use_fej_here ? clone_Ileft->Rot_fej() : clone_Ileft->Rot();
+    Eigen::Vector3d p_IleftinG = use_fej_here ? clone_Ileft->pos_fej() : clone_Ileft->pos();
     Eigen::Isometry3d T_IleftinG;
     T_IleftinG.translation() = p_IleftinG;
     T_IleftinG.linear() = R_GtoIleft.transpose();
     Eigen::Isometry3d T_GinCleft = T_ItoC * T_IleftinG.inverse();
 
-    // get normalized fature coordinate in left baseframe (i)
-    Eigen::Matrix< double, 3, 1 > f_Cleft;
-    f_Cleft << feature.uvs_norm.at(pair.first)[feature.baseframes.left_baseframe_index](0), feature.uvs_norm.at(pair.first)[feature.baseframes.left_baseframe_index](1), 1;
-    // f_Cleft /= f_Cleft.norm();
-    // f_Cleft /= f_Cleft(2);
-
     // get pose of right base frame (j)
-    std::shared_ptr<PoseJPL> clone_Iright = state->_clones_IMU.at(feature.timestamps[pair.first].at(feature.baseframes.right_baseframe_index));
-    Eigen::Matrix3d R_GtoIright = clone_Iright->Rot();
-    Eigen::Vector3d p_IrightinG = clone_Iright->pos();
+    Eigen::Matrix3d R_GtoIright = use_fej_here ? clone_Iright->Rot_fej() : clone_Iright->Rot();
+    Eigen::Vector3d p_IrightinG = use_fej_here ? clone_Iright->pos_fej() : clone_Iright->pos();
     Eigen::Isometry3d T_IrightinG;
     T_IrightinG.translation() = p_IrightinG;
     T_IrightinG.linear() = R_GtoIright.transpose();
     Eigen::Isometry3d T_GinCright = T_ItoC * T_IrightinG.inverse();
-
-    // get normalized fature coordinate in right baseframe (j)
-    Eigen::Matrix< double, 3, 1 > f_Cright;
-    f_Cright << feature.uvs_norm.at(pair.first)[feature.baseframes.right_baseframe_index](0), feature.uvs_norm.at(pair.first)[feature.baseframes.right_baseframe_index](1), 1;
-    // f_Cright /= f_Cright.norm();
-    // f_Cright /= f_Cright(2);
 
     // precompute some matrices
     Eigen::MatrixXd R_GtoCright = T_GinCright.linear();
@@ -435,13 +451,30 @@ void UpdaterHelper::get_feature_jacobian_full(std::shared_ptr<State> state, Upda
       //=========================================================================
 
       // If we are doing first estimate Jacobians, then overwrite with the first estimates
-      if (state->_options.do_fej) {
+      // PO-KF FEJ: the rewritten Jacobian below uses T_GinCi (via T_ci_cleft, J_Tcleft_pfci,
+      // J_Tci_pfci and J_x_Tc). T_GinCi was built above from the CURRENT pose and is not
+      // refreshed by the original overwrite -> the current-frame block stayed at the current
+      // estimate while p_FinCi switched to FEJ, mixing linearization points. Rebuild T_IiinG
+      // and T_GinCi from the FEJ pose here so the whole row is linearized about one point.
+      // use_fej_here (not do_fej): a degenerate/low-parallax feature falls back to the
+      // current estimate so we never freeze an ill-conditioned depth Jacobian.
+      if (use_fej_here) {
         R_GtoIi = clone_Ii->Rot_fej();
         p_IiinG = clone_Ii->pos_fej();
         // R_ItoC = calibration->Rot_fej();
         // p_IinC = calibration->pos_fej();
-        p_FinIi = R_GtoIi * (p_FinG_fej - p_IiinG);
-        p_FinCi = R_ItoC * p_FinIi + p_IinC;
+        T_IiinG.translation() = p_IiinG;
+        T_IiinG.linear() = R_GtoIi.transpose();
+        T_GinCi = T_ItoC * T_IiinG.inverse();
+        // PO-KF FEJ: reconstruct the feature from the FEJ base frames + FEJ depth (df_left)
+        // so the point used in the Jacobian is CONSISTENT with the frozen base-frame poses.
+        // p_FinG_fej (UpdaterMSCKF.cpp) is set to the CURRENT triangulation every update, so
+        // using it here mixed a current-estimate feature with frozen poses -> the gap grows
+        // with motion and the filter diverged on the aggressive MH_04/MH_05 sequences.
+        // df_left * f_Cleft is the feature in the left base camera frame at the FEJ depth;
+        // map it into camera i via the FEJ transform T_ci_cleft = T_GinCi * T_GinCleft^-1.
+        Eigen::Vector3d p_FinCleft_fej = df_left * f_Cleft;
+        p_FinCi = (T_GinCi * T_GinCleft.inverse()) * p_FinCleft_fej;
         // uv_norm << p_FinCi(0)/p_FinCi(2),p_FinCi(1)/p_FinCi(2);
         // cam_d = state->get_intrinsics_CAM(pair.first)->fej();
       }
