@@ -118,8 +118,11 @@ public:
    * @param[out] res Measurement residual for this feature
    * @param[out] x_order Extra variables our extra Jacobian has (for example anchored pose)
    */
-  static void get_feature_jacobian_full(std::shared_ptr<State> state, UpdaterHelperFeature &feature,
-                                        Eigen::MatrixXd &H_x, Eigen::VectorXd &res, std::vector<std::shared_ptr<ov_type::Type>> &x_order);
+  static void get_feature_jacobian_full_wpo(std::shared_ptr<State> state, UpdaterHelperFeature &feature, Eigen::MatrixXd &H_f,
+                                              Eigen::MatrixXd &H_x, Eigen::VectorXd &res, std::vector<std::shared_ptr<ov_type::Type>> &x_order);
+
+  static void get_feature_jacobian_full_po(std::shared_ptr<State> state, UpdaterHelperFeature &feature,
+                                              Eigen::MatrixXd &H_x, Eigen::VectorXd &res, std::vector<std::shared_ptr<ov_type::Type>> &x_order);
 
   /**
    * @brief This will project the left nullspace of H_f onto the linear system.
